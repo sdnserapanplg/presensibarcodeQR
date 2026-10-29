@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SIAKAD - Presensi Barcode</title>
+<link rel="icon" href="https://lh3.googleusercontent.com/d/1a4oMEH5GAaS2EmJdNSDlOdW0O8l4o4C9" type="image/png">
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#fff;font-family:'Segoe UI',Tahoma,Verdana,sans-serif}
+  #app{position:fixed;inset:0;width:100%;height:100%;border:0;display:block}
+
+  #loader{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;text-align:center;background:linear-gradient(150deg,#1b2340 0%,#3b4cca 58%,#14b8a6 100%);color:#fff;transition:opacity .35s}
+  #loader.off{opacity:0;pointer-events:none}
+  #loader img{width:84px;height:84px;object-fit:contain;background:#fff;border-radius:50%;padding:6px}
+  #loader .name{font-size:1.15rem;font-weight:700}
+  #loader .bar{width:180px;height:4px;border-radius:99px;background:rgba(255,255,255,.25);overflow:hidden}
+  #loader .bar i{display:block;width:40%;height:100%;border-radius:99px;background:#fff;animation:slide 1.2s ease-in-out infinite}
+  #msg{font-size:.9rem;opacity:.9;max-width:340px;line-height:1.5}
+  #msg.err{background:rgba(220,38,38,.9);padding:10px 14px;border-radius:10px;opacity:1}
+  @keyframes slide{0%{transform:translateX(-120%)}100%{transform:translateX(360%)}}
+  @media (prefers-reduced-motion:reduce){#loader .bar i{animation:none;width:100%}}
+</style>
+</head>
+<body>
+
+<div id="loader">
+  <img src="https://lh3.googleusercontent.com/d/1a4oMEH5GAaS2EmJdNSDlOdW0O8l4o4C9" alt="Logo sekolah">
+  <div class="name">SIAKAD - Presensi Barcode</div>
+  <div class="bar"><i></i></div>
+  <div id="msg">Menyiapkan aplikasi…</div>
+</div>
+
+<iframe id="app" title="SIAKAD - Presensi Barcode" allow="clipboard-write; fullscreen; web-share"></iframe>
+<noscript>Aktifkan JavaScript untuk membuka aplikasi ini.</noscript>
+
+<script>
+  // ====== ISI URL WEB APP APPS SCRIPT BARU DI SINI (URL /exec hasil Deploy) ======
+  var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzPQ9Vmc5yC7MWIZBe6zrBIHtoDUSd7BeoAiaNnWVkRVr0EdI9GbUKoe5PIHUfH4t4e/exec';
+  // ===============================================================================
+
+  (function () {
+    var frame = document.getElementById('app');
+    var loader = document.getElementById('loader');
+    var msg = document.getElementById('msg');
+
+    if (APPS_SCRIPT_URL.indexOf('ISI_ID_DEPLOYMENT_BARU') > -1) {
+      msg.textContent = 'URL web app belum diisi. Buka index.html lalu isi APPS_SCRIPT_URL.';
+      msg.className = 'err';
+      return;
+    }
+
+    var done = false;
+    function finish() {
+      if (done) return;
+      done = true;
+      loader.classList.add('off');
+      setTimeout(function () { loader.style.display = 'none'; }, 400);
+    }
+    frame.addEventListener('load', finish);
+    setTimeout(finish, 20000); // cadangan bila event load tidak terpicu
+    frame.src = APPS_SCRIPT_URL;
+  })();
+</script>
+</body>
+</html>
