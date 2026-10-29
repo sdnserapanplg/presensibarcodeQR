@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Scanner Absensi SIAKAD</title>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<style>
+  :root{--bg:#0f172a;--card:#1e293b;--txt:#f1f5f9;--mut:#94a3b8;--ok:#16a34a;--warn:#f59e0b;--err:#dc2626;--acc:#3b4cca}
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%;background:var(--bg);color:var(--txt);font-family:'Segoe UI',Tahoma,Arial,sans-serif}
+  .wrap{max-width:560px;margin:0 auto;padding:12px 14px calc(18px + env(safe-area-inset-bottom,0px))}
+  header{background:linear-gradient(135deg,#1b2340,#3b4cca 60%,#14b8a6);border-radius:16px;padding:14px 16px;margin-bottom:12px}
+  #hSek{font-size:12px;letter-spacing:.5px;opacity:.85;text-transform:uppercase}
+  #hInfo{font-size:19px;font-weight:800;margin-top:2px}
+  #hSub{font-size:13px;opacity:.85;margin-top:2px}
+  #hCount{margin-top:8px;display:inline-block;background:rgba(255,255,255,.18);border-radius:99px;padding:3px 12px;font-size:13px;font-weight:700}
+  #camWrap{position:relative;border-radius:16px;overflow:hidden;background:#000;aspect-ratio:4/3}
+  video{width:100%;height:100%;object-fit:cover;display:block}
+  .frame{position:absolute;inset:16%;border:3px solid rgba(255,255,255,.9);border-radius:18px;box-shadow:0 0 0 999px rgba(0,0,0,.28);pointer-events:none}
+  #camMsg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px;font-size:14px;color:var(--mut)}
+  #fb{margin-top:12px;border-radius:14px;padding:14px 16px;font-weight:800;font-size:18px;border:2px solid transparent}
+  #fb small{display:block;font-weight:500;font-size:14px;margin-top:2px;opacity:.9}
+  .idle{background:var(--card);border-color:#334155}
+  .ok{background:rgba(22,163,74,.2);border-color:var(--ok)}
+  .warn{background:rgba(245,158,11,.2);border-color:var(--warn)}
+  .err{background:rgba(220,38,38,.2);border-color:var(--err)}
+  .btns{display:flex;gap:8px;margin-top:12px}
+  button{font:inherit;font-weight:700;border:0;border-radius:12px;padding:12px 14px;cursor:pointer;color:#fff;background:var(--acc);flex:1}
+  button.sec{background:#334155}
+  button:disabled{opacity:.5}
+  details{margin-top:12px;background:var(--card);border-radius:12px;padding:10px 14px}
+  summary{cursor:pointer;font-weight:700;color:var(--mut)}
+  .row{display:flex;gap:8px;margin-top:10px}
+  input{flex:1;font:inherit;padding:10px 12px;border-radius:10px;border:1px solid #475569;background:#0f172a;color:var(--txt)}
+  #recent{margin-top:14px}
+  #recent h3{font-size:13px;color:var(--mut);margin:0 0 6px;text-transform:uppercase;letter-spacing:.5px}
+  .rc{display:flex;justify-content:space-between;gap:10px;background:var(--card);border-radius:10px;padding:9px 12px;margin-bottom:6px;font-size:14px}
+  .rc b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rc span{color:#4ade80;font-weight:700;flex:none}
+  #fatal{display:none;background:rgba(220,38,38,.2);border:2px solid var(--err);border-radius:14px;padding:18px;font-weight:700;line-height:1.5}
+
+  /* ===== BARU (Layar Penuh): tombol di pojok kamera + tampilan kamera memenuhi layar ===== */
+  .fsbtn{position:absolute;top:10px;right:10px;z-index:4;flex:none;padding:8px 12px;font-size:13px;background:rgba(15,23,42,.68);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
+  #fsTop{display:none}
+  html.fs-lock,html.fs-lock body{overflow:hidden;overscroll-behavior:none}
+  #scanArea.fs{position:fixed;inset:0;z-index:1000;background:#000;margin:0}
+  #scanArea.fs #camWrap{position:absolute;inset:0;border-radius:0;aspect-ratio:auto}
+  #scanArea.fs #bFs{display:none}
+  /* bingkai dibuat persegi di tengah layar (QR berbentuk persegi) */
+  #scanArea.fs .frame{inset:auto;left:50%;top:50%;width:min(72vmin,440px);height:min(72vmin,440px);transform:translate(-50%,-50%)}
+  /* baris atas: info kelas/mapel + jumlah sudah scan + tombol tutup */
+  #scanArea.fs #fsTop{display:flex;position:absolute;z-index:5;top:calc(10px + env(safe-area-inset-top,0px));left:12px;right:12px;gap:8px;align-items:flex-start;pointer-events:none}
+  #fsInfo{flex:1;min-width:0;background:rgba(15,23,42,.72);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border-radius:12px;padding:8px 12px}
+  #fsInfo b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #fsInfo span{font-size:12.5px;opacity:.9}
+  #bExit{flex:none;pointer-events:auto;padding:12px 16px;background:rgba(15,23,42,.72)}
+  /* hasil scan (nama siswa) melayang di atas kamera */
+  #scanArea.fs #fb{position:absolute;z-index:5;left:12px;right:12px;margin:0;top:calc(72px + env(safe-area-inset-top,0px));padding:10px 14px;color:#fff;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+  #scanArea.fs #fb.idle{background:rgba(30,41,59,.82)}
+  #scanArea.fs #fb.ok{background:rgba(22,163,74,.88)}
+  #scanArea.fs #fb.warn{background:rgba(217,119,6,.9)}
+  #scanArea.fs #fb.err{background:rgba(220,38,38,.9)}
+  /* tombol Mulai/Matikan Kamera & Ganti Kamera di bawah layar */
+  #scanArea.fs .btns{position:absolute;z-index:5;left:12px;right:12px;margin:0;bottom:calc(14px + env(safe-area-inset-bottom,0px))}
+  #scanArea.fs .btns button{padding:16px 14px;font-size:16px;background:rgba(59,76,202,.92)}
+  #scanArea.fs .btns button.sec{background:rgba(51,65,85,.92)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div id="hSek">SIAKAD</div>
+    <div id="hInfo">Memuat sesi...</div>
+    <div id="hSub"></div>
+    <span id="hCount" style="display:none"></span>
+  </header>
+
+  <div id="fatal"></div>
+
+  <div id="main">
+    <!-- BARU: #scanArea membungkus kamera + hasil scan + tombol, supaya ketiganya ikut layar penuh -->
+    <div id="scanArea">
+      <div id="camWrap">
+        <video id="v" playsinline muted></video>
+        <div class="frame"></div>
+        <div id="camMsg">Tekan "Mulai Kamera" lalu izinkan akses kamera.</div>
+        <button id="bFs" class="fsbtn" type="button" onclick="toggleFs()" aria-label="Layar penuh">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>Layar Penuh
+        </button>
+      </div>
+      <div id="fb" class="idle">Menunggu scan...</div>
+      <div class="btns">
+        <button id="bStart" onclick="startCam()">📷 Mulai Kamera</button>
+        <button id="bFlip" class="sec" onclick="flipCam()">🔄 Ganti Kamera</button>
+      </div>
+      <div id="fsTop">
+        <div id="fsInfo"><b id="fsT"></b><span id="fsC"></span></div>
+        <button id="bExit" type="button" onclick="exitFs()">✕ Tutup</button>
+      </div>
+    </div>
+    <details>
+      <summary>Ketik NIS manual</summary>
+      <div class="row">
+        <input id="manual" inputmode="numeric" placeholder="NIS siswa" onkeydown="if(event.key==='Enter')sendManual()">
+        <button style="flex:none" onclick="sendManual()">Kirim</button>
+      </div>
+    </details>
+    <div id="recent"><h3>Terakhir discan</h3><div id="rcList"></div></div>
+  </div>
+</div>
+
+<script>
+  // Alamat web app Apps Script (URL /exec). Ganti hanya jika URL deployment berubah.
+  const API_URL = 'https://script.google.com/macros/s/AKfycbzPQ9Vmc5yC7MWIZBe6zrBIHtoDUSd7BeoAiaNnWVkRVr0EdI9GbUKoe5PIHUfH4t4e/exec';
+
+  const CODE = new URLSearchParams(location.hash.slice(1)).get('c') || '';
+  const $ = function (id) { return document.getElementById(id); };
+  let stream = null, facing = 'environment', timer = null, last = { code: '', t: 0 }, audio = null, wake = null;
+  let cv = null;
+
+  function api(action, extra) {
+    const u = new URL(API_URL);
+    u.searchParams.set('action', action);
+    u.searchParams.set('code', CODE);
+    Object.keys(extra || {}).forEach(function (k) { u.searchParams.set(k, extra[k]); });
+    return fetch(u.toString()).then(function (r) { return r.json(); });
+  }
+
+  function fatal(msg) {
+    $('main').style.display = 'none';
+    const f = $('fatal'); f.style.display = 'block'; f.textContent = msg;
+    stopCam();
+  }
+
+  function fb(type, title, sub) {
+    const el = $('fb');
+    el.className = type;
+    el.textContent = title;
+    if (sub) { const s = document.createElement('small'); s.textContent = sub; el.appendChild(s); }
+  }
+
+  function beep(kind) {
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.connect(g); g.connect(audio.destination);
+      o.frequency.value = kind === 'ok' ? 880 : (kind === 'warn' ? 520 : 200);
+      g.gain.value = 0.1;
+      o.start(); o.stop(audio.currentTime + (kind === 'ok' ? 0.12 : 0.25));
+    } catch (e) { }
+    try { navigator.vibrate && navigator.vibrate(kind === 'ok' ? 40 : 120); } catch (e) { }
+  }
+
+  /* BARU (Suara "Terima kasih"): diucapkan lewat speaker perangkat setiap scan berhasil.
+     Memakai suara Bahasa Indonesia bawaan perangkat (id-ID) jika tersedia.
+     unlockSpeech() dipanggil dari klik "Mulai Kamera" karena browser (terutama iPhone)
+     hanya mengizinkan suara setelah ada sentuhan/klik dari pengguna. */
+  let speechReady = false;
+  function unlockSpeech() {
+    if (speechReady || !('speechSynthesis' in window)) return;
+    try {
+      const u = new SpeechSynthesisUtterance(' ');
+      u.volume = 0;
+      speechSynthesis.speak(u);
+      speechReady = true;
+    } catch (e) { }
+  }
+  // Teks yang diucapkan (ubah di sini jika ingin kalimat lain):
+  //   scan berhasil     -> 'Terima kasih'          (sayThanks)
+  //   sudah absen       -> 'Sudah absen'           (dipanggil di send())
+  //   barcode tak dikenal -> 'Barcode tidak dikenal' (dipanggil di send())
+  function sayThanks() { speakText('Terima kasih'); }
+
+  // Suara peringatan hanya sekali per kartu selama kartu masih diarahkan ke kamera
+  // (scan yang sama otomatis terbaca ulang tiap 3 detik), supaya tidak diulang-ulang.
+  // Setelah scan berhasil, kartu yang masih dipegang juga tidak langsung disusul "Sudah absen".
+  let lastVoice = { code: '', t: 0 };
+  function speakOnce(raw, text) {
+    const now = Date.now();
+    const sama = raw === lastVoice.code && now - lastVoice.t < 10000;
+    lastVoice = { code: raw, t: now };
+    if (!sama) speakText(text);
+  }
+
+  function speakText(text) {
+    if (!('speechSynthesis' in window)) return;
+    // jeda singkat supaya tidak bertabrakan dengan bunyi "bip" scan
+    setTimeout(function () {
+      try {
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = 'id-ID'; u.rate = 1; u.pitch = 1; u.volume = 1;
+        const vs = speechSynthesis.getVoices();
+        for (let i = 0; i < vs.length; i++) {
+          if (String(vs[i].lang || '').toLowerCase().replace('_', '-').indexOf('id') === 0) { u.voice = vs[i]; break; }
+        }
+        speechSynthesis.cancel();
+        speechSynthesis.speak(u);
+      } catch (e) { }
+    }, 180);
+  }
+
+  function setCount(n) {
+    const c = $('hCount');
+    c.style.display = 'inline-block';
+    c.textContent = n + ' siswa sudah scan';
+    syncFsInfo(); // BARU: jumlah di baris atas layar penuh ikut diperbarui
+  }
+
+  function addRecent(nama, jam) {
+    const list = $('rcList');
+    const d = document.createElement('div'); d.className = 'rc';
+    const b = document.createElement('b'); b.textContent = nama;
+    const s = document.createElement('span'); s.textContent = jam;
+    d.appendChild(b); d.appendChild(s);
+    list.insertBefore(d, list.firstChild);
+    while (list.children.length > 8) list.removeChild(list.lastChild);
+  }
+
+  async function send(raw) {
+    const now = Date.now();
+    if (raw === last.code && now - last.t < 3000) return;
+    last = { code: raw, t: now };
+    fb('idle', 'Memeriksa...');
+    try {
+      const r = await api('scanpush', { q: raw });
+      if (!r.ok) { fb('err', r.error || 'Gagal memproses scan', ''); beep('err'); return; }
+      if (r.status === 'ok') {
+        fb('ok', '✓ ' + r.nama, 'Hadir • pukul ' + r.jam + (r.kelas ? ' • ' + r.kelas : ''));
+        setCount(r.jumlah); addRecent(r.nama, r.jam); beep('ok');
+        lastVoice = { code: raw, t: Date.now() };
+        sayThanks();
+      } else if (r.status === 'dup') {
+        fb('warn', r.nama, 'Sudah absen pukul ' + r.jam); beep('warn');
+        speakOnce(raw, 'Sudah absen');
+      } else {
+        fb('err', 'Barcode tidak dikenal', 'Bukan siswa pada kelas ini'); beep('err');
+        speakOnce(raw, 'Barcode tidak dikenal');
+      }
+    } catch (e) {
+      last = { code: '', t: 0 };
+      fb('err', 'Gagal terhubung', 'Periksa internet lalu scan ulang'); beep('err');
+    }
+  }
+
+  function sendManual() {
+    const i = $('manual'); const v = i.value.trim(); i.value = '';
+    if (!v) return;
+    last = { code: '', t: 0 };
+    send(v);
+  }
+
+  async function startCam() {
+    unlockSpeech(); // harus di baris paling awal, selagi masih dalam klik pengguna
+    stopCam();
+    const msg = $('camMsg');
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      msg.style.display = 'flex';
+      msg.textContent = 'Browser tidak mendukung kamera. Buka dengan Chrome atau Safari terbaru lewat alamat https.';
+      return;
+    }
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: facing } }, audio: false });
+    } catch (e) {
+      stream = null;
+      msg.style.display = 'flex';
+      msg.textContent = (e && e.name === 'NotAllowedError')
+        ? 'Izin kamera ditolak. Ketuk ikon gembok di address bar, izinkan Kamera, lalu muat ulang halaman ini.'
+        : 'Kamera tidak dapat dibuka: ' + ((e && e.name) || e);
+      return;
+    }
+    const v = $('v');
+    v.srcObject = stream;
+    try { await v.play(); } catch (e) { }
+    msg.style.display = 'none';
+    $('bStart').textContent = '⏹ Matikan Kamera';
+    $('bStart').onclick = function () { stopCam(); };
+    try { if (navigator.wakeLock) wake = await navigator.wakeLock.request('screen'); } catch (e) { }
+    fb('idle', 'Arahkan QR pada kartu ke bingkai');
+    loop();
+  }
+
+  function stopCam() {
+    if (timer) { clearTimeout(timer); timer = null; }
+    if (stream) { try { stream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) { } stream = null; }
+    if (wake) { try { wake.release(); } catch (e) { } wake = null; }
+    const v = $('v'); if (v) v.srcObject = null;
+    const b = $('bStart');
+    if (b) { b.textContent = '📷 Mulai Kamera'; b.onclick = startCam; }
+    const m = $('camMsg');
+    if (m && $('main').style.display !== 'none') { m.style.display = 'flex'; m.textContent = 'Kamera mati. Tekan "Mulai Kamera".'; }
+  }
+
+  function flipCam() {
+    facing = facing === 'environment' ? 'user' : 'environment';
+    if (stream) startCam();
+  }
+
+  function loop() {
+    const v = $('v');
+    if (!stream) return;
+    if (v.readyState >= 2 && v.videoWidth) {
+      const sc = Math.min(1, 640 / v.videoWidth);
+      const w = Math.round(v.videoWidth * sc), h = Math.round(v.videoHeight * sc);
+      cv = cv || document.createElement('canvas');
+      cv.width = w; cv.height = h;
+      const cx = cv.getContext('2d', { willReadFrequently: true });
+      cx.drawImage(v, 0, 0, w, h);
+      const d = cx.getImageData(0, 0, w, h);
+      const code = jsQR(d.data, w, h, { inversionAttempts: 'dontInvert' });
+      if (code && code.data) send(code.data);
+    }
+    timer = setTimeout(loop, 120);
+  }
+
+  /* =====================================================================
+     BARU — LAYAR PENUH
+     Laptop/PC & Android: memakai mode layar penuh bawaan browser (Fullscreen API).
+     iPhone (Safari tidak mendukung Fullscreen API untuk elemen): otomatis memakai
+     tampilan yang menutupi seluruh halaman (fixed), hasilnya sama untuk scan.
+     Kamera tidak dimatikan/dimulai ulang saat masuk atau keluar layar penuh.
+     ===================================================================== */
+  let fsOn = false;
+
+  function fsElement() { return document.fullscreenElement || document.webkitFullscreenElement || null; }
+
+  function syncFsInfo() {
+    const t = $('fsT'), c = $('fsC');
+    if (!t || !c) return;
+    t.textContent = $('hInfo').textContent;
+    c.textContent = $('hCount').style.display === 'none' ? '' : $('hCount').textContent;
+  }
+
+  function setFs(on) {
+    fsOn = on;
+    $('scanArea').classList.toggle('fs', on);
+    document.documentElement.classList.toggle('fs-lock', on);
+    if (on) syncFsInfo();
+  }
+
+  async function enterFs() {
+    setFs(true);
+    const el = $('scanArea');
+    try {
+      if (el.requestFullscreen) await el.requestFullscreen();
+      else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+    } catch (e) { /* layar penuh bawaan browser tidak tersedia: tetap pakai tampilan penuh halaman */ }
+  }
+
+  async function exitFs() {
+    setFs(false);
+    try {
+      if (fsElement()) {
+        if (document.exitFullscreen) await document.exitFullscreen();
+        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+      }
+    } catch (e) { }
+  }
+
+  function toggleFs() { if (fsOn) exitFs(); else enterFs(); }
+
+  // Pengguna menekan Esc / gestur keluar dari browser: samakan tampilan halaman.
+  function onFsChange() { if (fsOn && !fsElement()) setFs(false); }
+  document.addEventListener('fullscreenchange', onFsChange);
+  document.addEventListener('webkitfullscreenchange', onFsChange);
+  // Cadangan untuk mode tampilan penuh tanpa Fullscreen API (iPhone).
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && fsOn) exitFs(); });
+
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible' && stream && !wake) {
+      try { if (navigator.wakeLock) navigator.wakeLock.request('screen').then(function (w) { wake = w; }); } catch (e) { }
+    }
+  });
+
+  (async function init() {
+    if (!CODE) { fatal('Kode sesi tidak ada. Buka halaman ini lewat tombol "Buka Scanner Kamera" di SIAKAD (menu Absensi Siswa → Absen Barcode).'); return; }
+    try {
+      const r = await api('scaninfo');
+      if (!r.ok) { fatal(r.error || 'Sesi tidak valid.'); return; }
+      $('hSek').textContent = r.sekolah || 'SIAKAD';
+      $('hInfo').textContent = (r.kelas || 'Semua Kelas') + ' • ' + r.mapel;
+      $('hSub').textContent = r.tanggal + ' • Guru: ' + r.guru;
+      setCount(r.jumlah || 0);
+    } catch (e) {
+      fatal('Tidak bisa terhubung ke SIAKAD. Periksa internet, dan pastikan web app Apps Script di-deploy dengan akses "Anyone" serta versi terbaru.');
+    }
+  })();
+</script>
+</body>
+</html>
